@@ -38,7 +38,13 @@ const PetForm = () => {
 
   useEffect(() => {
     if (pet) {
-      const { id: _id, createdBy: _createdBy, createdAt: _createdAt, updatedAt: _updatedAt, ...editable } = pet;
+      const {
+        id: _id,
+        createdBy: _createdBy,
+        createdAt: _createdAt,
+        updatedAt: _updatedAt,
+        ...editable
+      } = pet;
       setForm(editable);
     }
   }, [pet]);
@@ -53,8 +59,8 @@ const PetForm = () => {
   };
 
   const validateForm = () => {
-    const requiredValues = Object.values(form);
-    return requiredValues.every((value) => value && value.trim().length > 0);
+    // All fields are now optional
+    return true;
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,7 +148,6 @@ const PetForm = () => {
                   value={form[key]}
                   onChange={(e) => setValue(key, e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-border dark:border-dark-border bg-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  required
                 />
               </div>
             ))}
@@ -160,7 +165,9 @@ const PetForm = () => {
             ) : (
               <div className="text-center">
                 <Upload className="mx-auto mb-2 h-8 w-8 text-primary" />
-                <p className="font-semibold">{uploadingImage ? 'Uploading...' : 'Click to upload pet image'}</p>
+                <p className="font-semibold">
+                  {uploadingImage ? 'Uploading...' : 'Click to upload pet image'}
+                </p>
               </div>
             )}
           </div>
@@ -189,14 +196,28 @@ const PetForm = () => {
             >
               {isSaving ? (
                 <>
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
                   {isEdit ? 'Saving...' : 'Creating...'}
                 </>
               ) : (
-                <><Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Pet'}</>
+                <>
+                  <Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Pet'}
+                </>
               )}
             </button>
           </div>

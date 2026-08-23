@@ -26,6 +26,8 @@ const PetList = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [qrPet, setQrPet] = useState<{ id: string; name: string } | null>(null);
 
+  const petTagUrl = (petId: string) => `https://meowify.pk/pages/pet-tag?id=${petId}`;
+
   const selectedDeletePet = useMemo(
     () => pets?.find((pet) => pet.id === deleteId) || null,
     [deleteId, pets],
@@ -68,7 +70,9 @@ const PetList = () => {
 
       <div className="bg-white dark:bg-dark-card rounded-2xl border border-border dark:border-dark-border p-6 mb-6">
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">Manage all Meowify pet profiles and QR tags.</p>
+          <p className="text-sm text-muted-foreground">
+            Manage all Meowify pet profiles and QR tags.
+          </p>
           <Link
             to="/portal/pets/create"
             className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-hover"
@@ -81,7 +85,10 @@ const PetList = () => {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-44 animate-pulse rounded-2xl bg-white dark:bg-dark-card"></div>
+            <div
+              key={i}
+              className="h-44 animate-pulse rounded-2xl bg-white dark:bg-dark-card"
+            ></div>
           ))}
         </div>
       ) : (
@@ -93,7 +100,11 @@ const PetList = () => {
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex gap-3">
-                  <img src={pet.imageUrl} alt={pet.name} className="h-16 w-16 rounded-xl object-cover" />
+                  <img
+                    src={pet.imageUrl}
+                    alt={pet.name}
+                    className="h-16 w-16 rounded-xl object-cover"
+                  />
                   <div>
                     <h3 className="font-semibold text-lg">{pet.tagDisplayName}</h3>
                     <p className="text-sm text-muted-foreground">
@@ -133,7 +144,9 @@ const PetList = () => {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedDeletePet?.tagDisplayName || 'pet'}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete {selectedDeletePet?.tagDisplayName || 'pet'}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. It will permanently remove this profile.
             </AlertDialogDescription>
@@ -153,9 +166,14 @@ const PetList = () => {
           {qrPet ? (
             <div className="space-y-4">
               <div className="flex justify-center p-2 bg-white rounded-xl">
-                <QRCodeCanvas id={`pet-qr-${qrPet.id}`} value={`${appBaseUrl}/pet/${qrPet.id}`} size={220} includeMargin />
+                <QRCodeCanvas
+                  id={`pet-qr-${qrPet.id}`}
+                  value={petTagUrl(qrPet.id)}
+                  size={220}
+                  includeMargin
+                />
               </div>
-              <p className="text-xs text-muted-foreground break-all">{`${appBaseUrl}/pet/${qrPet.id}`}</p>
+              <p className="text-xs text-muted-foreground break-all">{petTagUrl(qrPet.id)}</p>
               <button
                 onClick={downloadQr}
                 className="w-full py-2 rounded-xl bg-primary text-white hover:bg-primary-hover"
