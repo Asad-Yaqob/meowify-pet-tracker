@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -8,6 +7,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from 'firebase/firestore';
 import { firestoreDb } from '../firebase/firebaseConfig';
@@ -27,9 +27,34 @@ const withTimeout = <T,>(promise: Promise<T>, ms = 10_000): Promise<T> =>
     ),
   ]);
 
+/** Generates a candidate pet ID with the format MFY-XXXXXX (always 6 digits). */
+const generatePetId = (): string => {
+  const number = Math.floor(Math.random() * 900_000) + 100_000; // 100000–999999
+  return `MFY-${number}`;
+};
+
+/**
+ * Finds a pet ID that does not yet exist in Firestore.
+ * Retries up to `maxAttempts` times before throwing.
+ */
+const generateUniquePetId = async (maxAttempts = 10): Promise<string> => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const petId = generatePetId();
+    const petRef = doc(firestoreDb, 'pets', petId);
+    const snapshot = await withTimeout(getDoc(petRef));
+    if (!snapshot.exists()) {
+      return petId;
+    }
+    console.warn(`Pet ID collision on "${petId}" (attempt ${attempt}/${maxAttempts}), retrying…`);
+  }
+  throw new Error(`Failed to generate a unique pet ID after ${maxAttempts} attempts.`);
+};
+
 export const createPet = async (payload: PetPayload, createdBy: string) => {
+  const petId = await generateUniquePetId();
+  const petRef = doc(firestoreDb, 'pets', petId);
   await withTimeout(
-    addDoc(petsCollection, {
+    setDoc(petRef, {
       ...payload,
       createdBy,
       createdAt: serverTimestamp(),
