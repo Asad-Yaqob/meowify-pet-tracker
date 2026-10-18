@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { ArrowLeft, Save, Upload } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from 'src/context/auth/AuthContext';
 import BreadcrumbComp from 'src/layouts/full/shared/breadcrumb/BreadcrumbComp';
@@ -76,7 +76,21 @@ const PetForm = () => {
       toast.error(error.message || 'Image upload failed');
     } finally {
       setUploadingImage(false);
+      // Reset the input so the same file can be re-selected if needed
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
+  };
+
+  const handleRemoveImage = (event: React.MouseEvent) => {
+    // Prevent the click from bubbling up to the upload area
+    event.stopPropagation();
+    setValue('imageUrl', '');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    toast.success('Image removed');
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -156,21 +170,68 @@ const PetForm = () => {
 
         <div className="bg-white dark:bg-dark-card rounded-2xl p-6 border border-border dark:border-dark-border shadow-sm">
           <h2 className="text-xl font-semibold mb-4">Image Upload</h2>
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="h-64 border-2 border-dashed rounded-2xl cursor-pointer flex items-center justify-center overflow-hidden border-border dark:border-dark-border hover:border-primary transition-colors"
-          >
-            {form.imageUrl ? (
-              <img src={form.imageUrl} alt={form.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="text-center">
-                <Upload className="mx-auto mb-2 h-8 w-8 text-primary" />
-                <p className="font-semibold">
-                  {uploadingImage ? 'Uploading...' : 'Click to upload pet image'}
-                </p>
-              </div>
+          <div className="relative">
+            <div
+              onClick={() => !uploadingImage && fileInputRef.current?.click()}
+              className={`h-64 border-2 border-dashed rounded-2xl flex items-center justify-center overflow-hidden border-border dark:border-dark-border transition-colors ${
+                uploadingImage
+                  ? 'cursor-not-allowed opacity-70'
+                  : 'cursor-pointer hover:border-primary'
+              }`}
+            >
+              {form.imageUrl ? (
+                <img src={form.imageUrl} alt={form.name || 'Pet image'} className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-center">
+                  {uploadingImage ? (
+                    <>
+                      <svg
+                        className="animate-spin mx-auto mb-2 h-8 w-8 text-primary"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v8z"
+                        />
+                      </svg>
+                      <p className="font-semibold text-sm text-muted-foreground">Uploading…</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mx-auto mb-2 h-8 w-8 text-primary" />
+                      <p className="font-semibold">Click to upload pet image</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP up to 10 MB</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Remove button — only shown when an image is present and not currently uploading */}
+            {form.imageUrl && !uploadingImage && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                aria-label="Remove image"
+                className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/90 hover:bg-red-600 text-white text-xs font-medium shadow-md transition-all"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Remove
+              </button>
             )}
           </div>
+
           <input
             type="file"
             ref={fileInputRef}
