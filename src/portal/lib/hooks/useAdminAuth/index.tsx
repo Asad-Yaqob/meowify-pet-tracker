@@ -1,7 +1,6 @@
-"use client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createAdmin, loginAdmin, logoutAdmin, getCurrentAdmin } from "src/lib/services/api/adminAuth";
-import { AdminResponse, ApiResponse, CreateAdminInput, LoginData } from "src/lib/types/adminAuthTypes";
+import { createAdmin, loginAdmin, logoutAdmin, getCurrentAdmin } from "../../services/api/adminAuth";
+import { AdminResponse, ApiResponse, CreateAdminInput, LoginData } from "../../types/adminAuthTypes";
 
 // Hook to create a new admin
 export const useCreateAdmin = () => {

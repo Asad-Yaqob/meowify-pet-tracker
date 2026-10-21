@@ -24,7 +24,7 @@ const Header = () => {
   });
 
   const handleResize = useEffectEvent(() => {
-    if (window.innerWidth > 1023) {
+    if (window.innerWidth > 1279) {
       setIsOpen(false);
     }
   });

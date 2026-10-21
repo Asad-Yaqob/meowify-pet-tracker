@@ -9,6 +9,19 @@ import { uploadPetImage } from 'src/lib/services/api/cloudinaryService';
 import { PetPayload } from 'src/lib/types/petTypes';
 import { Label } from 'src/components/ui/label';
 
+/** Reusable inline spinner to replace duplicated inline SVGs */
+const SpinnerIcon = ({ className = 'h-4 w-4' }: { className?: string }) => (
+  <svg
+    className={`animate-spin ${className}`}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+  >
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+  </svg>
+);
+
 const emptyForm: PetPayload = {
   name: '',
   gender: '',
@@ -58,11 +71,6 @@ const PetForm = () => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const validateForm = () => {
-    // All fields are now optional
-    return true;
-  };
-
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -95,10 +103,6 @@ const PetForm = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!validateForm()) {
-      toast.error('Please fill all fields and upload image.');
-      return;
-    }
 
     if (!user) {
       toast.error('Session expired. Please login again.');
@@ -185,26 +189,7 @@ const PetForm = () => {
                 <div className="text-center">
                   {uploadingImage ? (
                     <>
-                      <svg
-                        className="animate-spin mx-auto mb-2 h-8 w-8 text-primary"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v8z"
-                        />
-                      </svg>
+                      <SpinnerIcon className="mx-auto mb-2 h-8 w-8 text-primary" />
                       <p className="font-semibold text-sm text-muted-foreground">Uploading…</p>
                     </>
                   ) : (
@@ -257,22 +242,7 @@ const PetForm = () => {
             >
               {isSaving ? (
                 <>
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
+                  <SpinnerIcon className="h-4 w-4" />
                   {isEdit ? 'Saving...' : 'Creating...'}
                 </>
               ) : (

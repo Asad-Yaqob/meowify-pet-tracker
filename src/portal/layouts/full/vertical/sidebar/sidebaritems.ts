@@ -29,8 +29,6 @@ export interface MenuItem {
   isPro?: boolean;
 }
 
-import { uniqueId } from 'lodash';
-
 const SidebarContent: MenuItem[] = [
   {
     heading: 'Meowify',
@@ -38,23 +36,23 @@ const SidebarContent: MenuItem[] = [
       {
         name: 'Dashboard',
         icon: 'solar:widget-2-linear',
-        id: uniqueId(),
+        id: 1,
         url: '/portal/dashboard',
         isPro: false,
       },
       {
         name: 'Pet Profiles',
         icon: 'solar:cat-linear',
-        id: uniqueId(),
+        id: 2,
         children: [
           {
-            id: uniqueId(),
+            id: 3,
             name: 'Pet List',
             url: '/portal/pets',
             isPro: false,
           },
           {
-            id: uniqueId(),
+            id: 4,
             name: 'Create Pet',
             url: '/portal/pets/create',
             isPro: false,

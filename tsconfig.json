@@ -3,6 +3,9 @@
     "paths": {
       "src/*": [
         "./src/portal/*"
+      ],
+      "@portal/*": [
+        "./src/portal/*"
       ]
     },
     "target": "ES2020",

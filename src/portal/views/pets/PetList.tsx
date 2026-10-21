@@ -17,7 +17,14 @@ import {
 } from 'src/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from 'src/components/ui/dialog';
 
-const appBaseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
+// In production, always use the real meowify.pk tag URL.
+// In development, use the preview project URL (VITE_APP_BASE_URL or window.location.origin) pointing to /pet/:id
+const isProd = import.meta.env.PROD;
+const appBaseUrl = import.meta.env.VITE_APP_BASE_URL;
+const petTagUrl = (petId: string) =>
+  isProd
+    ? `https://meowify.pk/pages/pet-tag?id=${petId}`
+    : `${appBaseUrl || window.location.origin}/pet/${petId}`;
 
 const PetList = () => {
   const navigate = useNavigate();
@@ -25,8 +32,6 @@ const PetList = () => {
   const deleteMutation = useDeletePet();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [qrPet, setQrPet] = useState<{ id: string; name: string } | null>(null);
-
-  const petTagUrl = (petId: string) => `https://meowify.pk/pages/pet-tag?id=${petId}`;
 
   const selectedDeletePet = useMemo(
     () => pets?.find((pet) => pet.id === deleteId) || null,
@@ -91,6 +96,18 @@ const PetList = () => {
             ></div>
           ))}
         </div>
+      ) : pets && pets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="text-7xl mb-4">🐱</div>
+          <h3 className="text-xl font-semibold mb-2">No pets yet</h3>
+          <p className="text-sm text-muted-foreground mb-6">Create your first pet profile and generate a QR tag.</p>
+          <Link
+            to="/portal/pets/create"
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-hover"
+          >
+            <Plus className="h-4 w-4" /> Create Pet
+          </Link>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {pets?.map((pet) => (
@@ -101,9 +118,13 @@ const PetList = () => {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex gap-3">
                   <img
-                    src={pet.imageUrl}
+                    src={pet.imageUrl || 'https://placehold.co/64x64/f8e4d0/c9684a?text=🐱'}
                     alt={pet.name}
                     className="h-16 w-16 rounded-xl object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        'https://placehold.co/64x64/f8e4d0/c9684a?text=🐱';
+                    }}
                   />
                   <div>
                     <h3 className="font-semibold text-lg">{pet.tagDisplayName}</h3>
@@ -117,18 +138,21 @@ const PetList = () => {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => navigate(`/portal/pets/edit/${pet.id}`)}
                     className="p-2 rounded-lg border border-border dark:border-dark-border hover:bg-lightgray"
                   >
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setDeleteId(pet.id)}
                     className="p-2 rounded-lg border border-border dark:border-dark-border hover:bg-red-50 text-red-500"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setQrPet({ id: pet.id, name: pet.tagDisplayName })}
                     className="p-2 rounded-lg border border-border dark:border-dark-border hover:bg-lightgray"
                   >

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getCurrentAdmin, loginAdmin as apiLogin, logoutAdmin as apiLogout } from '../../lib/services/api/adminAuth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { loginAdmin as apiLogin, logoutAdmin as apiLogout } from '../../lib/services/api/adminAuth';
+import { firebaseAuth } from '../../lib/services/firebase/firebaseConfig';
 import { AdminResponse, LoginData } from '../../lib/types/adminAuthTypes';
 
 interface AuthContextType {
@@ -17,18 +19,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const response = await getCurrentAdmin();
-                setUser(response.data);
-            } catch (_error) {
+        const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+            if (firebaseUser) {
+                setUser({
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email || '',
+                    name: firebaseUser.displayName || 'Admin',
+                });
+            } else {
                 setUser(null);
-            } finally {
-                setLoading(false);
             }
-        };
-
-        checkAuth();
+            setLoading(false);
+        });
+        return unsubscribe;
     }, []);
 
     const login = async (data: LoginData) => {
@@ -40,7 +43,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             await apiLogout();
         } catch (error) {
-            console.error("Logout failed", error);
+            console.error('Logout failed', error);
         } finally {
             setUser(null);
         }

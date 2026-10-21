@@ -1,5 +1,5 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
-import { AdminResponse, ApiResponse, CreateAdminInput, LoginData } from 'src/lib/types/adminAuthTypes';
+import { AdminResponse, ApiResponse, CreateAdminInput, LoginData } from '../../types/adminAuthTypes';
 import { firebaseAuth } from '../firebase/firebaseConfig';
 
 const mapFirebaseUser = (user: User): AdminResponse => ({
