@@ -2,22 +2,39 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-// ── Firebase Admin (initialise once per cold start) ──────────────────
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    }),
-  });
-}
+// ── Lazy Firebase Admin Initialiser ─────────────────────────────────
+function getDb() {
+  if (!getApps().length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
 
-const db = getFirestore();
+    // Strip surrounding quotes if wrapped in quotes in Vercel UI
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    privateKey = privateKey.replace(/\\n/g, '\n');
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error(
+        `Missing Firebase Admin environment variables on Vercel: projectId=${!!projectId}, clientEmail=${!!clientEmail}, privateKey=${!!privateKey}`
+      );
+    }
+
+    initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+  }
+  return getFirestore();
+}
 
 // ── Rate-limiter (in-memory) ─────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 6;
+const RATE_LIMIT = 8;
 const RATE_WINDOW = 300_000; // 5 minutes
 
 function isRateLimited(key: string): boolean {
@@ -32,32 +49,26 @@ function isRateLimited(key: string): boolean {
 }
 
 // ── CORS helpers ─────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = [
-  'https://meowify.pk',
-  'https://www.meowify.pk',
-  process.env.VITE_APP_BASE_URL,
-].filter(Boolean);
-
 function setCors(req: VercelRequest, res: VercelResponse) {
-  const origin = req.headers.origin || '';
-  if (
-    ALLOWED_ORIGINS.includes(origin) ||
-    origin.endsWith('.myshopify.com') ||
-    origin.endsWith('.vercel.app') ||
-    origin.includes('localhost')
-  ) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
 // ── Handler ──────────────────────────────────────────────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res);
 
-  if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  // Preflight must return immediately with 200/204
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   try {
     const { petId, currentPassword, payload } = req.body || {};
@@ -74,6 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(429).json({ error: 'Too many save attempts. Please wait 5 minutes.' });
     }
 
+    const db = getDb();
     const petRef = db.collection('pets').doc(petId);
     const petDoc = await petRef.get();
 
@@ -107,7 +119,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // If first time activation, also set createdAt if not present
     if (!petDoc.data()?.createdAt) {
       publicUpdate.createdAt = FieldValue.serverTimestamp();
     }
@@ -128,8 +139,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(200).json({ success: true, message: 'Pet tag saved successfully.' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Save tag error:', err);
-    return res.status(500).json({ error: 'Internal server error while saving tag.' });
+    return res.status(500).json({ error: err.message || 'Internal server error while saving tag.' });
   }
 }

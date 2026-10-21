@@ -3,25 +3,39 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
 
-// ── Firebase Admin (initialise once per cold start) ──────────────────
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // Vercel stores multi-line env vars with escaped newlines
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    }),
-  });
+// ── Lazy Firebase Admin Initialiser ─────────────────────────────────
+function getDb() {
+  if (!getApps().length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    privateKey = privateKey.replace(/\\n/g, '\n');
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error(
+        `Missing Firebase Admin environment variables on Vercel: projectId=${!!projectId}, clientEmail=${!!clientEmail}, privateKey=${!!privateKey}`
+      );
+    }
+
+    initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+  }
+  return getFirestore();
 }
 
-const db = getFirestore();
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// ── Rate-limiter (in-memory, per cold-start instance) ────────────────
+// ── Rate-limiter (in-memory) ─────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 3;        // max attempts
-const RATE_WINDOW = 600_000; // 10 minutes
+const RATE_LIMIT = 3;
+const RATE_WINDOW = 600_000;
 
 function isRateLimited(key: string): boolean {
   const now = Date.now();
@@ -35,24 +49,12 @@ function isRateLimited(key: string): boolean {
 }
 
 // ── CORS helpers ─────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = [
-  'https://meowify.pk',
-  'https://www.meowify.pk',
-  process.env.VITE_APP_BASE_URL, // dev preview URL
-].filter(Boolean);
-
 function setCors(req: VercelRequest, res: VercelResponse) {
-  const origin = req.headers.origin || '';
-  if (
-    ALLOWED_ORIGINS.includes(origin) ||
-    origin.endsWith('.myshopify.com') ||
-    origin.endsWith('.vercel.app') ||
-    origin.includes('localhost')
-  ) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
 // ── Handler ──────────────────────────────────────────────────────────
@@ -60,9 +62,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res);
 
   // Preflight
-  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Only POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -70,7 +71,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { petId, email } = req.body || {};
 
-    // ── Validate input ───────────────────────────────────────────────
     if (!petId || typeof petId !== 'string') {
       return res.status(400).json({ error: 'Missing or invalid petId.' });
     }
@@ -80,14 +80,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // ── Rate-limit by petId ──────────────────────────────────────────
     if (isRateLimited(petId)) {
       return res.status(429).json({
         error: 'Too many recovery attempts. Please try again after 10 minutes.',
       });
     }
 
-    // ── Fetch public pet document from Firestore ─────────────────────
+    const db = getDb();
     const petDoc = await db.collection('pets').doc(petId).get();
 
     if (!petDoc.exists) {
@@ -96,7 +95,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const pet = petDoc.data()!;
 
-    // ── Fetch private credentials from subcollection ─────────────────
     const credDoc = await db.collection('pets').doc(petId)
       .collection('private').doc('credentials').get();
 
@@ -105,22 +103,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!registeredEmail) {
       return res.status(400).json({
-        error: 'No recovery email on file for this tag. Contact support via WhatsApp: 0339-1252725',
+        error: 'No recovery email on file for this tag. Please contact support via WhatsApp: 0339-1252725.',
       });
     }
 
-    // ── Verify email match ───────────────────────────────────────────
     if (cleanEmail !== registeredEmail) {
       return res.status(400).json({
         error: 'Email does not match our records for this tag.',
       });
     }
 
-    // ── Send the recovery email via Resend ───────────────────────────
     const petName = pet.name || 'Your Pet';
     const ownerName = pet.ownerName || 'Pet Owner';
     const petPassword = creds.password || '';
     const petUrl = `https://meowify.pk/pages/pet-tag?id=${encodeURIComponent(petId)}`;
+
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('Missing RESEND_API_KEY on Vercel.');
+    }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const { error: sendError } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'Meowify <notifications@meowify.pk>',
@@ -138,25 +140,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             Hi <strong>${ownerName}</strong>,
           </p>
           <p style="color: #2D2438; font-size: 15px; line-height: 1.6;">
-            You requested your password for <strong>${petName}</strong>'s pet tag
-            (ID: <code style="background: #FFE3D6; padding: 2px 8px; border-radius: 6px; font-size: 13px;">${petId}</code>).
+            You requested password recovery for <strong>${petName}</strong>'s Meowify tag (ID: <code>${petId}</code>).
           </p>
 
-          <div style="background: #ffffff; border: 2px dashed #FF9B7B; border-radius: 16px; padding: 20px; text-align: center; margin: 24px 0;">
-            <span style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-bottom: 8px;">Your Password</span>
-            <strong style="font-size: 24px; color: #2D2438; font-family: 'Courier New', monospace; letter-spacing: 2px;">${petPassword}</strong>
+          <div style="background: #ffffff; border: 2px dashed #FF9B7B; border-radius: 14px; padding: 18px 24px; text-align: center; margin: 24px 0;">
+            <p style="margin: 0 0 6px; font-size: 12px; color: rgba(45,36,56,0.6); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Your Tag Password</p>
+            <p style="margin: 0; font-size: 24px; font-weight: 800; color: #2D2438; font-family: monospace; letter-spacing: 2px;">${petPassword}</p>
           </div>
 
-          <div style="text-align: center; margin: 28px 0;">
-            <a href="${petUrl}" style="background: #FF9B7B; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 999px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(255,155,123,0.4);">
-              Go to Pet Profile →
-            </a>
-          </div>
+          <p style="color: #2D2438; font-size: 14px; line-height: 1.6;">
+            You can use this password to edit ${petName}'s profile anytime at:
+          </p>
+          <p style="text-align: center; margin: 16px 0;">
+            <a href="${petUrl}" style="background: #FF9B7B; color: #ffffff; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block;">View Pet Tag Profile</a>
+          </p>
 
-          <hr style="border: none; border-top: 1px solid rgba(45,36,56,0.08); margin: 24px 0;">
-          <p style="font-size: 12px; color: #999; text-align: center; margin: 0; line-height: 1.5;">
-            If you didn't request this, you can safely ignore this email.<br>
-            Need help? WhatsApp us: <a href="https://wa.me/923391252725" style="color: #FF9B7B;">0339-1252725</a>
+          <hr style="border: none; border-top: 1px solid rgba(255,155,123,0.3); margin: 24px 0;" />
+          <p style="color: rgba(45,36,56,0.5); font-size: 12px; text-align: center; margin: 0;">
+            If you did not request this recovery, you can safely ignore this email.<br/>
+            Need help? Contact WhatsApp: <strong>0339-1252725</strong>
           </p>
         </div>
       `,
@@ -164,16 +166,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (sendError) {
       console.error('Resend error:', sendError);
-      return res.status(500).json({ error: 'Failed to send recovery email. Please try again later.' });
+      return res.status(500).json({ error: 'Failed to send recovery email. Please try again.' });
     }
+
+    const masked = cleanEmail.replace(/^(.{2})(.*)(@.*)$/, (_, a, b, c) => a + '*'.repeat(Math.max(b.length, 3)) + c);
 
     return res.status(200).json({
       success: true,
-      message: `Recovery email sent to ${registeredEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3')}`,
+      message: `Recovery email sent to ${masked}. Please check your inbox.`,
     });
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('Recover password error:', err);
-    return res.status(500).json({ error: 'Internal server error. Please try again later.' });
+    return res.status(500).json({ error: err.message || 'Internal server error. Please try again later.' });
   }
 }
