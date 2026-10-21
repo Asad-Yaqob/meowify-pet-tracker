@@ -6,7 +6,10 @@ import { Resend } from 'resend';
 // ── Lazy Firebase Admin Initialiser ─────────────────────────────────
 function getDb() {
   if (!getApps().length) {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const projectId =
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.VITE_FIREBASE_PROJECT_ID ||
+      'react-with-firebase-48bff';
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
     let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
 
