@@ -210,11 +210,10 @@ const PetForm = () => {
           <div className="relative">
             <div
               onClick={() => !uploadingImage && fileInputRef.current?.click()}
-              className={`h-64 border-2 border-dashed rounded-2xl flex items-center justify-center overflow-hidden border-border dark:border-dark-border transition-colors ${
-                uploadingImage
+              className={`h-64 border-2 border-dashed rounded-2xl flex items-center justify-center overflow-hidden border-border dark:border-dark-border transition-colors ${uploadingImage
                   ? 'cursor-not-allowed opacity-70'
                   : 'cursor-pointer hover:border-primary'
-              }`}
+                }`}
             >
               {form.imageUrl ? (
                 <img src={form.imageUrl} alt={form.name || 'Pet image'} className="w-full h-full object-cover" />

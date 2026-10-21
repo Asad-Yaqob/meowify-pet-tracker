@@ -40,7 +40,12 @@ const ALLOWED_ORIGINS = [
 
 function setCors(req: VercelRequest, res: VercelResponse) {
   const origin = req.headers.origin || '';
-  if (ALLOWED_ORIGINS.includes(origin)) {
+  if (
+    ALLOWED_ORIGINS.includes(origin) ||
+    origin.endsWith('.myshopify.com') ||
+    origin.endsWith('.vercel.app') ||
+    origin.includes('localhost')
+  ) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
