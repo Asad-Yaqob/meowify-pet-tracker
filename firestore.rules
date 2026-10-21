@@ -1,9 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Public pet profiles — anyone can read (name, breed, photo, contact, etc.)
+    // Only authenticated admin can create/update/delete
     match /pets/{petId} {
       allow read: if true;
       allow create, update, delete: if request.auth != null;
+    }
+
+    // Private credentials (email + password) — blocked from unauthenticated public reads
+    // Authenticated admin users CAN read/write; Firebase Admin SDK bypasses rules entirely
+    match /pets/{petId}/private/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Admin users collection
+    match /admin/{adminId} {
+      allow read, write: if request.auth != null;
     }
   }
 }

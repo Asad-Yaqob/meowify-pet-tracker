@@ -9,6 +9,8 @@ import { uploadPetImage } from 'src/lib/services/api/cloudinaryService';
 import { PetPayload } from 'src/lib/types/petTypes';
 import { Label } from 'src/components/ui/label';
 
+import { validateEmail, validateStrongPassword } from '../../lib/utils/validation';
+
 /** Reusable inline spinner to replace duplicated inline SVGs */
 const SpinnerIcon = ({ className = 'h-4 w-4' }: { className?: string }) => (
   <svg
@@ -28,12 +30,13 @@ const emptyForm: PetPayload = {
   breed: '',
   color: '',
   age: '',
-  identification: '',
   tagDisplayName: '',
   ownerName: '',
   ownerAddress: '',
   contactNumber: '',
   imageUrl: '',
+  email: '',
+  password: '',
 };
 
 const PetForm = () => {
@@ -56,9 +59,14 @@ const PetForm = () => {
         createdBy: _createdBy,
         createdAt: _createdAt,
         updatedAt: _updatedAt,
+        identification: _identification,
         ...editable
       } = pet;
-      setForm(editable);
+      setForm({
+        ...editable,
+        email: pet.email || '',
+        password: pet.password || '',
+      });
     }
   }, [pet]);
 
@@ -110,6 +118,22 @@ const PetForm = () => {
       return;
     }
 
+    if (form.email) {
+      const emailValidation = validateEmail(form.email);
+      if (!emailValidation.isValid) {
+        toast.error(emailValidation.error || 'Invalid email address');
+        return;
+      }
+    }
+
+    if (form.password) {
+      const passwordValidation = validateStrongPassword(form.password);
+      if (!passwordValidation.isValid) {
+        toast.error(passwordValidation.error || 'Password is too weak');
+        return;
+      }
+    }
+
     try {
       if (isEdit && id) {
         await updateMutation.mutateAsync(form);
@@ -152,19 +176,28 @@ const PetForm = () => {
                 ['breed', 'Breed'],
                 ['color', 'Color'],
                 ['age', 'Age'],
-                ['identification', 'Identification'],
                 ['tagDisplayName', 'Tag Display Name'],
                 ['ownerName', 'Owner Name'],
                 ['ownerAddress', 'Owner Address'],
                 ['contactNumber', 'Contact Number'],
+                ['email', 'Owner Email'],
+                ['password', 'Tag Password / PIN'],
               ] as Array<[keyof PetPayload, string]>
             ).map(([key, label]) => (
               <div key={key} className="space-y-2">
                 <Label htmlFor={key}>{label}</Label>
                 <input
                   id={key}
-                  value={form[key]}
+                  type={key === 'password' ? 'password' : key === 'email' ? 'email' : 'text'}
+                  value={form[key] || ''}
                   onChange={(e) => setValue(key, e.target.value)}
+                  placeholder={
+                    key === 'password'
+                      ? 'Min 8 chars, 1 uppercase, 1 lowercase, 1 digit, 1 symbol'
+                      : key === 'email'
+                        ? 'e.g. name@gmail.com'
+                        : undefined
+                  }
                   className="w-full px-4 py-3 rounded-xl border border-border dark:border-dark-border bg-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 />
               </div>

@@ -1,4 +1,4 @@
-import { MapPin, Phone, PhoneCall, User, Tag, Palette, Cat, Fingerprint, Shield, Heart } from 'lucide-react';
+import { MapPin, Phone, PhoneCall, User, Tag, Palette, Cat, Shield, Heart } from 'lucide-react';
 import { useParams } from 'react-router';
 import { usePet } from 'src/lib/hooks/usePets';
 import Spinner from '../spinner/Spinner';
@@ -155,7 +155,7 @@ const PublicPetPage = () => {
               </h1>
               <p className="text-gray-400 mt-2 text-sm flex items-center gap-1.5">
                 <Shield className="h-3.5 w-3.5" />
-                ID: <span className="font-mono font-semibold text-gray-600">{pet.identification}</span>
+                Tag: <span className="font-mono font-semibold text-gray-600">{pet.tagDisplayName || pet.id}</span>
               </p>
             </div>
 
@@ -172,7 +172,6 @@ const PublicPetPage = () => {
                 <DetailItem icon={Palette}     label="Color / Coat"   value={pet.color} />
                 <DetailItem icon={Tag}         label="Gender"         value={`${pet.gender} ${genderEmoji}`} />
                 <DetailItem icon={Heart}       label="Age"            value={pet.age} />
-                <DetailItem icon={Fingerprint} label="ID / Chip No."  value={pet.identification} />
               </div>
             </div>
 
